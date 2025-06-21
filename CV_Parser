@@ -1,0 +1,59 @@
+# ✅ Install necessary packages
+!pip install pdfplumber python-docx
+
+# ✅ Import libraries
+import pandas as pd
+import pdfplumber
+from docx import Document
+from google.colab import files
+import io
+import os
+
+# ✅ Upload files
+uploaded = files.upload()
+
+# ✅ Helper functions
+def extract_text_from_pdf(file_stream):
+    try:
+        with pdfplumber.open(file_stream) as pdf:
+            return "\n".join(page.extract_text() or '' for page in pdf.pages)
+    except:
+        return "Error reading PDF"
+
+def extract_text_from_docx(file_stream):
+    try:
+        doc = Document(file_stream)
+        return "\n".join([para.text for para in doc.paragraphs])
+    except:
+        return "Error reading DOCX"
+
+def extract_text_from_txt(file_stream):
+    try:
+        return file_stream.read().decode('utf-8')
+    except:
+        return "Error reading TXT"
+
+# ✅ Process uploaded files
+data = []
+
+for filename, file in uploaded.items():
+    file_stream = io.BytesIO(file)
+
+    if filename.lower().endswith('.pdf'):
+        text = extract_text_from_pdf(file_stream)
+    elif filename.lower().endswith('.docx'):
+        text = extract_text_from_docx(file_stream)
+    elif filename.lower().endswith('.txt'):
+        text = extract_text_from_txt(file_stream)
+    else:
+        text = "Unsupported file type"
+
+    data.append({'Filename': filename, 'Extracted_Text': text})
+
+# ✅ Save to CSV
+df = pd.DataFrame(data)
+csv_filename = "extracted_texts.csv"
+df.to_csv(csv_filename, index=False)
+
+# ✅ Download the CSV
+files.download(csv_filename)
