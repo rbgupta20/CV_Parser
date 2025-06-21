@@ -1,0 +1,143 @@
+# ✅ Install required packages
+!pip install pandas requests
+
+# ✅ Import libraries
+from google.colab import files
+import pandas as pd
+import requests
+import json
+import time
+
+# ✅ Upload CSV file
+uploaded = files.upload()
+filename = list(uploaded.keys())[0]
+df = pd.read_csv(filename)
+
+# ✅ Ensure first column is named 'text'
+if df.columns[0].lower() != 'text':
+    df.columns = ['text'] + df.columns.tolist()[1:]
+
+# ✅ DeepSeek API setup
+DEEPSEEK_API_KEY = "sk-575fa064e3f047fa8a3845c87bb34898"  # ← Replace with your DeepSeek API key
+DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
+
+headers = {
+    "Content-Type": "application/json",
+    "Authorization": f"Bearer {DEEPSEEK_API_KEY}"
+}
+
+# ✅ Function to extract all required fields
+def extract_info(text):
+    prompt = f"""
+Extract the following information from the resume text:
+
+1. Name
+2. Derived Gender from Name (based on name only)
+3. Gender (from resume content)
+4. Total Years of experience
+5. Email ID
+6. Mobile Number
+7. Key Technical Skills (list top 5 only)
+8. Current Organization Name
+9. Total months working in Current Organization
+
+Resume Text:
+\"\"\"
+{text}
+\"\"\"
+
+Respond strictly in this JSON format:
+{{
+  "Name": "Candidate's full name",
+  "Derived Gender from Name": "Male/Female/Unclear",
+  "Gender": "Male/Female/Other/Not mentioned",
+  "Total Years of experience": "X years",
+  "Email ID": "email@example.com",
+  "Mobile Number": "XXXXXXXXXX",
+  "Key Technical Skills": ["Skill1", "Skill2", ...],
+  "Current Organization Name": "Company name",
+  "Total months working in Current Organization": "X months"
+}}
+"""
+    payload = {
+        "model": "deepseek-chat",
+        "messages": [
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.2
+    }
+
+    try:
+        response = requests.post(DEEPSEEK_API_URL, headers=headers, data=json.dumps(payload))
+        response.raise_for_status()
+        result = response.json()
+        content = result['choices'][0]['message']['content']
+
+        if content.startswith("```json"):
+            content = content.replace("```json", "").replace("```", "").strip()
+
+        parsed = json.loads(content)
+        return (
+            parsed.get("Name", ""),
+            parsed.get("Derived Gender from Name", ""),
+            parsed.get("Gender", ""),
+            parsed.get("Total Years of experience", ""),
+            parsed.get("Email ID", ""),
+            parsed.get("Mobile Number", ""),
+            ", ".join(parsed.get("Key Technical Skills", [])),
+            parsed.get("Current Organization Name", ""),
+            parsed.get("Total months working in Current Organization", "")
+        )
+
+    except Exception as e:
+        print("❌ Error processing row:", e)
+        return "", "", "", "", "", "", "", "", ""
+# ✅ Process each resume
+names = []
+derived_genders = []
+genders = []
+experiences = []
+emails = []
+mobiles = []
+skills = []
+organizations = []
+months_in_org = []
+
+for i, row in df.iterrows():
+    name, d_gender, gender, exp, email, mobile, skill, org, months = extract_info(row['text'])
+    names.append(name)
+    derived_genders.append(d_gender)
+    genders.append(gender)
+    experiences.append(exp)
+    emails.append(email)
+    mobiles.append(mobile)
+    skills.append(skill)
+    organizations.append(org)
+    months_in_org.append(months)
+
+    print(f"✅ Row {i+1}/{len(df)} → Name: {name} | Exp: {exp} | Gender: {gender} | D-Gender: {d_gender} | Email: {email} | Org: {org} | Months: {months}")
+    time.sleep(1.2)
+# ✅ Save to DataFrame and CSV
+df['Name'] = names
+df['Derived Gender from Name'] = derived_genders
+df['Gender'] = genders
+df['Total Years of Experience'] = experiences
+df['Email ID'] = emails
+df['Mobile Number'] = mobiles
+df['Key Technical Skills'] = skills
+df['Current Organization Name'] = organizations
+df['Total months working in Current Organization'] = months_in_org
+
+# ✅ Preview results
+print("\n🎯 Final Extracted Info:")
+print(df[[
+    'Name', 'Derived Gender from Name', 'Gender',
+    'Total Years of Experience', 'Email ID', 'Mobile Number',
+    'Key Technical Skills', 'Current Organization Name',
+    'Total months working in Current Organization'
+]])
+
+# ✅ Save and download CSV
+output_file = "resume_info_extracted_full.csv"
+df.to_csv(output_file, index=False)
+files.download(output_file)
