@@ -18,7 +18,7 @@ if df.columns[0].lower() != 'text':
     df.columns = ['text'] + df.columns.tolist()[1:]
 
 # ✅ DeepSeek API setup
-DEEPSEEK_API_KEY = "sk-575fa064e3f047fa8a3845c87bb34898"  # ← Replace with your DeepSeek API key
+DEEPSEEK_API_KEY = "Key paste here"  # ← Replace with your DeepSeek API key
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 
 headers = {
